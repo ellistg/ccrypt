@@ -3,14 +3,21 @@ const std = @import("std");
 const bigrams = @import("analysis/bigrams.zig").bigram_log_freq;
 const quadgrams = @import("analysis/quadgrams.zig").quadgram_log_freq;
 
-pub const FitFn = struct {
+// TODO write tests for safe varients
+
+pub const Fitness = struct {
     step: usize = 1,
     fitFn: fn ([]const u8, usize) f32,
+    fitSFn: fn ([]const u8, usize) f32,
     cmpFn: fn (f32, f32) bool,
 
     const Self = @This();
     pub fn fit(self: *const Self, text: []const u8) f32 {
         return self.fitFn(text, self.step);
+    }
+
+    pub fn fitS(self: *const Self, text: []const u8) f32 {
+        return self.fitSFn(text, self.step);
     }
 
     pub fn cmp(self: *const Self, a: f32, b: f32) bool {
@@ -47,7 +54,7 @@ const mono_freq = std.meta.Vector(26, f32){
 /// Generates count of each lowercase alphabetic character in a string
 /// Input must consist of only lowercase alphabetic characters or the function will crash
 /// The items in the returned array are alphabetically ordered; 0 -> a, 1 -> b, ...
-fn getAlphCounts(text: []const u8, step: usize) [26]f32 {
+fn getAlphCount(text: []const u8, step: usize) [26]f32 {
     var alph_counts = std.mem.zeroes([26]f32);
     var i: usize = 0;
     while (i < text.len) : (i += step) {
@@ -58,11 +65,24 @@ fn getAlphCounts(text: []const u8, step: usize) [26]f32 {
     return alph_counts;
 }
 
+fn getAlphCountS(text: []const u8, step: usize) [26]f32 {
+    var alph_counts = std.mem.zeroes([26]f32);
+    var i: usize = 0;
+    while (i < text.len) : (i += step) {
+        const char = text[i];
+        if (std.ascii.isAlpha(char)) {
+            alph_counts[(char & 31) - 1] += 1;
+        }
+    }
+
+    return alph_counts;
+}
+
 test "alph counts" {
     const s = try std.testing.allocator.dupe(u8, "abbcyyzaa");
     defer std.testing.allocator.free(s);
 
-    const alph_counts = getAlphCounts(s, 1);
+    const alph_counts = getAlphCount(s, 1);
 
     // Check all values known to be non-zero
     try std.testing.expect(alph_counts[0] == 3);
@@ -79,7 +99,7 @@ test "alph counts" {
 
 /// Generates count of any characters that could be in a text.
 /// uppercase and lowercase of the same character will be counted seperately
-fn getCharCounts(text: []const u8, step: usize) [255]f32 {
+fn getCharCount(text: []const u8, step: usize) [255]f32 {
     var char_counts = std.mem.zeroes([255]f32);
     var i: usize = 0;
     while (i < text.len) : (i += step) {
@@ -93,7 +113,7 @@ test "char chounts" {
     const s = try std.testing.allocator.dupe(u8, "AAbyz>>*yy");
     defer std.testing.allocator.free(s);
 
-    var counts = getCharCounts(s, 1);
+    var counts = getCharCount(s, 1);
 
     // Check all values known to be non-zero
     try std.testing.expect(counts['A'] == 2);
@@ -117,18 +137,29 @@ test "char chounts" {
 
 /// Calculates the Chi-Squared statistic against the English Distribution
 /// Requires that input is sanitised meaning it only contains lowercase alphabetic characters
-fn chiSquaredFn(text: []const u8, step: usize) f32 {
-    const count: std.meta.Vector(26, f32) = getAlphCounts(text, step);
-    const expected = mono_freq * @splat(26, @intToFloat(f32, text.len));
-    const delta = count - expected;
-    const fitness = @reduce(.Add, delta * delta / expected);
-    return fitness;
+fn chiSquaredGen(comptime safe: bool) fn ([]const u8, usize) f32 {
+    return struct {
+        const alphCountFn = switch (safe) {
+            true => getAlphCountS,
+            false => getAlphCount,
+        };
+
+        pub fn chiSquared(text: []const u8, step: usize) f32 {
+            const count: std.meta.Vector(26, f32) = alphCountFn(text, step);
+
+            const expected = mono_freq * @splat(26, @intToFloat(f32, text.len));
+            const delta = count - expected;
+            const fitness = @reduce(.Add, delta * delta / expected);
+            return fitness;
+        }
+    }.chiSquared;
 }
 
-pub fn chiSquared(step: usize) FitFn {
-    return FitFn{
+pub fn chiSquared(step: usize) Fitness {
+    return Fitness{
         .step = step,
-        .fitFn = chiSquaredFn,
+        .fitFn = chiSquaredGen(false),
+        .fitSFn = chiSquaredGen(true),
         .cmpFn = lessThan,
     };
 }
@@ -154,16 +185,17 @@ test "chi-squared" {
 /// If text contains upper and lowercase letters may give unexpected 
 /// result as will take them to be different characters
 fn iocFn(text: []const u8, step: usize) f32 {
-    const count: std.meta.Vector(255, f32) = getCharCounts(text, step);
+    const count: std.meta.Vector(255, f32) = getCharCount(text, step);
     const count_dec = count - @splat(255, @as(f32, 1));
     const fitness = @reduce(.Add, count * count_dec) / @intToFloat(f32, text.len * (text.len - 1));
     return fitness;
 }
 
-pub fn ioc(step: usize) FitFn {
-    return FitFn{
+pub fn ioc(step: usize) Fitness {
+    return Fitness{
         .step = step,
         .fitFn = iocFn,
+        .fitSFn = iocFn,
         .cmpFn = CloserTo(0.066),
     };
 }
@@ -190,7 +222,7 @@ test "index of coincidence" {
 // The same will apply for trigram and quadgram fitness
 // All three require for the text to be entirely lowercase alphabetic
 
-pub fn biFitFn(text: []const u8, step: usize) f32 {
+pub fn biFitness(text: []const u8, step: usize) f32 {
     var fitness: f32 = 0.0;
     var i: usize = 0;
 
@@ -204,10 +236,46 @@ pub fn biFitFn(text: []const u8, step: usize) f32 {
     return fitness;
 }
 
-pub fn biFit(step: usize) FitFn {
-    return FitFn{
+pub fn biFitnessS(text: []const u8, step: usize) f32 {
+    var fitness: f32 = 0.0;
+    var i: usize = 0;
+
+    var pair: [2]u8 = undefined;
+    var step_count: usize = 0;
+
+    while (i < text.len - 1) : (i += 1) {
+        if (std.ascii.isAlpha(text[i])) {
+            pair[0] = (text[i] & 31) - 1 + 'a';
+            break;
+        }
+    }
+
+    const coef = std.meta.Vector(2, u32){ 26, 1 };
+    while (i < text.len - 1) : (i += 1) {
+        if (std.ascii.isAlpha(text[i])) {
+            step_count += 1;
+            if (step_count == step) {
+                pair[1] = (text[i] & 31) - 1 + 'a';
+
+                const bg8: std.meta.Vector(2, u8) = pair;
+                const bg: std.meta.Vector(2, u32) = bg8 - @splat(2, @as(u8, 'a'));
+                const pos = @reduce(.Add, bg * coef);
+                fitness += bigrams[pos];
+
+                step_count = 0;
+                pair[0] = pair[1];
+            }
+        }
+
+        return fitness;
+    }
+}
+
+pub fn biFit(step: usize) Fitness {
+    return Fitness{
         .step = step,
-        .fitFn = biFitFn,
+        .fitFn = biFitness,
+        .fitSFn = biFitnessS,
         .cmpFn = greaterThan,
     };
 }
@@ -231,7 +299,7 @@ test "bigram fitness" {
     try std.testing.expect(fit_eng > -75.0);
 }
 
-pub fn quadFitFn(text: []const u8, step: usize) f32 {
+pub fn quadFitness(text: []const u8, step: usize) f32 {
     var fitness: f32 = 0.0;
     var i: usize = 0;
 
@@ -245,10 +313,51 @@ pub fn quadFitFn(text: []const u8, step: usize) f32 {
     return fitness;
 }
 
-pub fn quadFit(step: usize) FitFn {
-    return FitFn{
+pub fn quadFitnessS(text: []const u8, step: usize) f32 {
+    var fitness: f32 = 0.0;
+    var i: usize = 0;
+
+    var quad: [4]u8 = undefined;
+    var step_count: usize = 0;
+
+    inline for (.{ 0, 1, 2 }) |pos| {
+        while (i < text.len - 1) : (i += 1) {
+            if (std.ascii.isAlpha(text[i])) {
+                quad[pos] = (text[i] & 31) - 1 + 'a';
+                break;
+            }
+        }
+    }
+
+    const coef = std.meta.Vector(4, u32){ 17576, 676, 26, 1 };
+    while (i < text.len - 3) : (i += 1) {
+        if (std.ascii.isAlpha(text[i])) {
+            step_count += 1;
+            if (step_count == step) {
+                quad[3] = (text[i] & 31) - 1 + 'a';
+
+                const qg8: std.meta.Vector(4, u8) = quad;
+                const qg: std.meta.Vector(4, u32) = qg8 - @splat(4, @as(u8, 'a'));
+                const pos = @reduce(.Add, qg * coef);
+                fitness += quadgrams[pos];
+
+                quad[0] = quad[1];
+                quad[1] = quad[2];
+                quad[2] = quad[3];
+
+                step_count = 0;
+            }
+        }
+
+        return fitness;
+    }
+}
+
+pub fn quadFit(step: usize) Fitness {
+    return Fitness{
         .step = step,
-        .fitFn = quadFitFn,
+        .fitFn = quadFitness,
+        .fitSFn = quadFitnessS,
         .cmpFn = greaterThan,
     };
 }

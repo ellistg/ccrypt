@@ -4,7 +4,7 @@ const ccrypt = @import("../ccrypt.zig");
 pub fn brute(
     comptime Cipher: type,
 ) fn (
-    ccrypt.analysis.FitFn,
+    ccrypt.analysis.Fitness,
     ccrypt.cipher.Crypt,
     *Cipher.Key,
     usize,
@@ -13,7 +13,7 @@ pub fn brute(
 ) anyerror!void {
     return struct {
         pub fn brute(
-            fitness: ccrypt.analysis.FitFn,
+            fitness: ccrypt.analysis.Fitness,
             crypt: ccrypt.cipher.Crypt,
             key: *Cipher.Key,
             num_iter: usize,
