@@ -33,7 +33,7 @@ pub const Fitness = struct {
         self.fitUsed = if (safety) self.fitSFn else self.fitFn;
     }
 
-    pub fn fit(self: *const Self, text: []const u8) f32 {
+    pub fn calc(self: *const Self, text: []const u8) f32 {
         return self.fitUsed(text, self.step);
     }
 
