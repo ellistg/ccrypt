@@ -183,8 +183,8 @@ test "chi-squared" {
     const s_not = try std.testing.allocator.dupe(u8, "kaldfjalksdfjasldkfasdfasdfb");
     defer std.testing.allocator.free(s_not);
 
-    const fit_eng = chiSquared(1).fit(s_eng);
-    const fit_not = chiSquared(1).fit(s_not);
+    const fit_eng = chiSquared(1).calc(s_eng);
+    const fit_not = chiSquared(1).calc(s_not);
 
     // Check s_eng is within 2 of expected fitness
     try std.testing.expect(@fabs(fit_eng - 18.5) < 2);
@@ -212,7 +212,7 @@ test "index of coincidence" {
     const s = try allocator.dupe(u8, "defendtheeastwallofthecastle");
     defer allocator.free(s);
 
-    const fit = ioc(1).fit(s);
+    const fit = ioc(1).calc(s);
 
     // The tolerance for ioc is usually 0.01 but as the text is very short had to increase
     // This gives a less accurate test but should be fine
@@ -291,8 +291,8 @@ test "bigram fitness" {
     const s_not = try allocator.dupe(u8, "fkasjlfdkjfaksfheoifsfnvakfe");
     defer allocator.free(s_not);
 
-    const fit_eng = biFit(1).fit(s_eng);
-    const fit_not = biFit(1).fit(s_not);
+    const fit_eng = biFit(1).calc(s_eng);
+    const fit_not = biFit(1).calc(s_not);
 
     // Check better than random text
     try std.testing.expect(fit_eng > fit_not);
@@ -368,8 +368,8 @@ test "quadgram fitness" {
     const s_not = try allocator.dupe(u8, "fkasjlfdkjfaksfheoifsfnvakfe");
     defer allocator.free(s_not);
 
-    const fit_eng = quadFit(1).fit(s_eng);
-    const fit_not = quadFit(1).fit(s_not);
+    const fit_eng = quadFit(1).calc(s_eng);
+    const fit_not = quadFit(1).calc(s_not);
 
     // Check better than random text
     try std.testing.expect(fit_eng > fit_not);
