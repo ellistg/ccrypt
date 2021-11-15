@@ -273,9 +273,8 @@ pub fn biFitnessS(text: []const u8, step: usize) f32 {
                 pair[0] = pair[1];
             }
         }
-
-        return fitness;
     }
+    return fitness;
 }
 
 pub fn biFit(step: usize) Fitness {
@@ -350,9 +349,8 @@ pub fn quadFitnessS(text: []const u8, step: usize) f32 {
                 step_count = 0;
             }
         }
-
-        return fitness;
     }
+    return fitness;
 }
 
 pub fn quadFit(step: usize) Fitness {
