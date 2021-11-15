@@ -1,22 +1,24 @@
 const std = @import("std");
-const ccrypt = @import("../ccrypt.zig");
+
+const cipher = @import("../cipher.zig");
+const analysis = @import("../analysis.zig");
 
 pub fn brute(
     comptime Cipher: type,
 ) fn (
     *std.mem.Allocator,
-    *ccrypt.analysis.Fitness,
-    ccrypt.cipher.Crypt,
-    []align(ccrypt.textAlign) const u8,
+    *analysis.Fitness,
+    cipher.Crypt,
+    []align(cipher.textAlign) const u8,
     Cipher.Key.Type,
     usize,
 ) anyerror!Cipher.Key.Basic {
     return struct {
         pub fn brute(
             allocator: *std.mem.Allocator,
-            fitness: *ccrypt.analysis.Fitness,
-            crypt: ccrypt.cipher.Crypt,
-            text: []align(ccrypt.textAlign) const u8,
+            fitness: *analysis.Fitness,
+            crypt: cipher.Crypt,
+            text: []align(cipher.textAlign) const u8,
             start_key: Cipher.Key.Type,
             num_iter: usize,
         ) !Cipher.Key.Basic {
