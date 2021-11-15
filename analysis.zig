@@ -6,18 +6,35 @@ const quadgrams = @import("analysis/quadgrams.zig").quadgram_log_freq;
 // TODO write tests for safe varients
 
 pub const Fitness = struct {
-    step: usize = 1,
+    step: usize,
     fitFn: fn ([]const u8, usize) f32,
     fitSFn: fn ([]const u8, usize) f32,
+    fitUsed: fn ([]const u8, usize) f32,
     cmpFn: fn (f32, f32) bool,
 
     const Self = @This();
-    pub fn fit(self: *const Self, text: []const u8) f32 {
-        return self.fitFn(text, self.step);
+
+    pub fn init(
+        step: usize,
+        fitFn: fn ([]const u8, usize) f32,
+        fitSFn: fn ([]const u8, usize) f32,
+        cmpFn: fn (f32, f32) bool,
+    ) Self {
+        return Self{
+            .step = step,
+            .fitFn = fitFn,
+            .fitSFn = fitSFn,
+            .fitUsed = fitSFn,
+            .cmpFn = cmpFn,
+        };
     }
 
-    pub fn fitS(self: *const Self, text: []const u8) f32 {
-        return self.fitSFn(text, self.step);
+    pub fn safe(self: *Self, safety: bool) void {
+        self.fitUsed = if (safety) self.fitSFn else self.fitFn;
+    }
+
+    pub fn fit(self: *const Self, text: []const u8) f32 {
+        return self.fitUsed(text, self.step);
     }
 
     pub fn cmp(self: *const Self, a: f32, b: f32) bool {
@@ -156,12 +173,7 @@ fn chiSquaredGen(comptime safe: bool) fn ([]const u8, usize) f32 {
 }
 
 pub fn chiSquared(step: usize) Fitness {
-    return Fitness{
-        .step = step,
-        .fitFn = chiSquaredGen(false),
-        .fitSFn = chiSquaredGen(true),
-        .cmpFn = lessThan,
-    };
+    return Fitness.init(step, chiSquaredGen(false), chiSquaredGen(true), lessThan);
 }
 
 test "chi-squared" {
@@ -192,12 +204,7 @@ fn iocFn(text: []const u8, step: usize) f32 {
 }
 
 pub fn ioc(step: usize) Fitness {
-    return Fitness{
-        .step = step,
-        .fitFn = iocFn,
-        .fitSFn = iocFn,
-        .cmpFn = CloserTo(0.066),
-    };
+    return Fitness.init(step, iocFn, iocFn, CloserTo(0.066));
 }
 
 test "index of coincidence" {
@@ -272,12 +279,7 @@ pub fn biFitnessS(text: []const u8, step: usize) f32 {
 }
 
 pub fn biFit(step: usize) Fitness {
-    return Fitness{
-        .step = step,
-        .fitFn = biFitness,
-        .fitSFn = biFitnessS,
-        .cmpFn = greaterThan,
-    };
+    return Fitness.init(step, biFitness, biFitnessS, greaterThan);
 }
 
 test "bigram fitness" {
@@ -354,12 +356,7 @@ pub fn quadFitnessS(text: []const u8, step: usize) f32 {
 }
 
 pub fn quadFit(step: usize) Fitness {
-    return Fitness{
-        .step = step,
-        .fitFn = quadFitness,
-        .fitSFn = quadFitnessS,
-        .cmpFn = greaterThan,
-    };
+    return Fitness.init(step, quadFitness, quadFitnessS, greaterThan);
 }
 
 test "quadgram fitness" {
