@@ -1,5 +1,5 @@
 const std = @import("std");
-const ccrypt = @import("ccrypt.zig");
+const analysis = @import("analysis.zig");
 
 const method = struct {
     pub const brute = @import("method/brute.zig").brute;
@@ -27,16 +27,19 @@ pub fn Cipher(
         pub const Key = struct {
             pub const Type = KeyType;
 
+            // Struct containing all data and functions needed to decode/encode
+            // a ciphertext/plaintext. This type should be used as the test key
+            // for any method.
             pub const Full = struct {
                 v: KeyType,
                 context: Context,
 
-                text: []align(ccrypt.textAlign) const u8,
-                buf: []align(ccrypt.textAlign) u8,
+                text: []align(textAlign) const u8,
+                buf: []align(textAlign) u8,
                 freeText: bool,
 
                 cryptFn: fn ([]const u8, KeyType, Context.Type, []u8) void,
-                fitness: ccrypt.analysis.Fitness,
+                fitness: analysis.Fitness,
 
                 // Not used by every cipher but always stored for simplicity of lib
                 allocator: *std.mem.Allocator,
@@ -45,10 +48,10 @@ pub fn Cipher(
 
                 pub fn init(
                     allocator: *std.mem.Allocator,
-                    fitness: *ccrypt.analysis.Fitness,
+                    fitness: *analysis.Fitness,
                     cryptE: Crypt,
                     key: KeyType,
-                    text: []align(ccrypt.textAlign) const u8,
+                    text: []align(textAlign) const u8,
                 ) std.mem.Allocator.Error!Self {
                     const safety = detectSafetyFn(text);
 
@@ -60,7 +63,7 @@ pub fn Cipher(
                     var free = false;
 
                     if (safety == .UnsafeAfterStrip) {
-                        var t = std.ArrayListAligned(u8, ccrypt.textAlign).init(allocator);
+                        var t = std.ArrayListAligned(u8, textAlign).init(allocator);
                         errdefer t.deinit();
 
                         for (text) |c| {
@@ -72,7 +75,8 @@ pub fn Cipher(
                         free = true;
                     }
 
-                    var buf = try allocator.alignedAlloc(u8, ccrypt.textAlign, textF.len);
+                    var buf = try allocator.alignedAlloc(u8, textAlign, textF.len);
+                    errdefer allocator.free(buf);
 
                     const cryptFn = switch (safety) {
                         .Safe => switch (cryptE) {
@@ -111,6 +115,10 @@ pub fn Cipher(
                     return self.fitness.calc(self.buf);
                 }
 
+                pub fn copy(self: *Self, key: *KeyType) void {
+                    copyFn(&self.v, key);
+                }
+
                 // If no pointer is provided for nextFn there will be no next function
                 // in the key, resulting compile error rather than unresolved bug if
                 // a cipher is used in an attack method that requires it.
@@ -121,6 +129,8 @@ pub fn Cipher(
                 } else struct {};
             };
 
+            // Struct only containing key data needed to describe the final
+            // result of an attack, used as return type by all methods.
             pub const Basic = struct {
                 v: KeyType,
                 context: Context,
@@ -147,7 +157,7 @@ pub fn Cipher(
                     self.context.deinit();
                 }
 
-                pub fn log(self: *Self, key: *KeyType) void {
+                pub fn copy(self: *Self, key: *KeyType) void {
                     copyFn(&self.v, key);
                 }
             };
@@ -162,6 +172,10 @@ pub fn Cipher(
     };
 }
 
+// Use 512-bit vectors in order to make best use of modern CPUs (eg. AVX-512)
+pub const textAlign = @alignOf(std.meta.Vector(512 / 8, u8));
+
+// Use for `Context` in Cipher if none is needed.
 pub const VoidContext = struct {
     v: void = {},
 
