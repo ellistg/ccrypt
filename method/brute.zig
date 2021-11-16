@@ -31,7 +31,7 @@ pub fn brute(
             var best_fit: f32 = key.fitness.calc(text);
 
             var count: usize = 0;
-            while (count <= num_iter) {
+            while (count < num_iter) {
                 try key.next();
 
                 key.crypt();
@@ -39,7 +39,7 @@ pub fn brute(
 
                 if (key.fitness.cmp(test_fit, best_fit)) {
                     best_fit = test_fit;
-                    best.log(&key.v);
+                    best.copy(&key.v);
                 }
 
                 count += 1;
