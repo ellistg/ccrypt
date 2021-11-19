@@ -22,7 +22,7 @@ fn copyFn(a: *u5, b: *u5) void {
 fn freeFn(_: *std.mem.Allocator, _: *u5) void {}
 
 fn detectSafetyFn(_: []const u8) cipher.Safety {
-    // TODO actually implement this
+    // TODO is it worth checking if it needs stripping or just doing it regardless?
     return .UnsafeAfterStrip;
 }
 
@@ -34,6 +34,24 @@ fn encryptFn(text: []const u8, key: u5, _: void, output: []u8) void {
 
 fn decryptFn(text: []const u8, key: u5, _: void, output: []u8) void {
     encryptFn(text, 26 - key, {}, output);
+}
+
+fn encryptSFn(text: []const u8, key: u5, _: void, output: []u8) void {
+    for (text) |char, idx| {
+        if (std.ascii.isAlpha(char)) {
+            if (std.ascii.isLower(char)) {
+                output[idx] = (char - 'a' + key) % 26 + 'a';
+            } else {
+                output[idx] = (char - 'A' + key) % 26 + 'A';
+            }
+        } else {
+            output[idx] = char;
+        }
+    }
+}
+
+fn decryptSFn(text: []const u8, key: u5, _: void, output: []u8) void {
+    encryptSFn(text, 26 - key, {}, output);
 }
 
 pub usingnamespace cipher.Cipher(
@@ -49,8 +67,8 @@ pub usingnamespace cipher.Cipher(
     //
     decryptFn,
     encryptFn,
-    decryptFn,
-    encryptFn,
+    decryptSFn,
+    encryptSFn,
 
     .Mono,
 );
