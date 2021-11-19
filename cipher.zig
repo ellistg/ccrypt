@@ -166,6 +166,25 @@ pub fn Cipher(
         pub const kind = kind_val;
         pub const CipherImpl = @This();
 
+        pub fn crypt(
+            allocator: *std.mem.Allocator,
+            cryptE: Crypt,
+            text: []const u8,
+            key: KeyType,
+        ) ![]u8 {
+            const cryptFn = switch (cryptE) {
+                .Encrypt => encryptS,
+                .Decrypt => decryptS,
+            };
+
+            const buf = try allocator.alloc(u8, text.len);
+            var context = Context.init(allocator, key, text);
+            defer context.deinit();
+            cryptFn(text, key, context.v, buf);
+
+            return buf;
+        }
+
         pub usingnamespace if (@hasDecl(Key.Full, "next")) struct {
             pub const brute = method.brute(CipherImpl);
         } else struct {};
