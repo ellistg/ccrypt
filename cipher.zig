@@ -112,6 +112,7 @@ pub fn Cipher(
                 /// Release all data stored by the Full Key.
                 pub fn deinit(self: *Self) void {
                     freeFn(self.allocator, &self.v);
+                    self.allocator.free(self.buf);
                     if (self.freeText) self.allocator.free(self.text);
                 }
 
