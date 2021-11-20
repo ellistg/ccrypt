@@ -274,8 +274,7 @@ test "index of coincidence" {
 //      zz -> 675
 // The same will apply for trigram and quadgram fitness
 // All three require for the text to be entirely lowercase alphabetic
-
-pub fn biFitness(text: []const u8, step: usize) f32 {
+fn biFitness(text: []const u8, step: usize) f32 {
     var fitness: f32 = 0.0;
     var i: usize = 0;
 
@@ -289,7 +288,7 @@ pub fn biFitness(text: []const u8, step: usize) f32 {
     return fitness;
 }
 
-pub fn biFitnessS(text: []const u8, step: usize) f32 {
+fn biFitnessS(text: []const u8, step: usize) f32 {
     var fitness: f32 = 0.0;
     var i: usize = 0;
 
@@ -354,7 +353,7 @@ test "bigram fitness safe" {
     try std.testing.expect(fit.cmp(fit_eng, fit_not));
 }
 
-pub fn quadFitness(text: []const u8, step: usize) f32 {
+fn quadFitness(text: []const u8, step: usize) f32 {
     var fitness: f32 = 0.0;
     var i: usize = 0;
 
@@ -368,7 +367,7 @@ pub fn quadFitness(text: []const u8, step: usize) f32 {
     return fitness;
 }
 
-pub fn quadFitnessS(text: []const u8, step: usize) f32 {
+fn quadFitnessS(text: []const u8, step: usize) f32 {
     var fitness: f32 = 0.0;
     var i: usize = 0;
 
