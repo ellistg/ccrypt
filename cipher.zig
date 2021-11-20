@@ -7,13 +7,13 @@ const method = struct {
 
 /// Comptime interface to generate the type for each cipher.
 pub fn Cipher(
+    comptime Context: type,
+    //
     comptime KeyType: type,
     comptime dupeFn: fn (*std.mem.Allocator, KeyType) std.mem.Allocator.Error!KeyType,
     comptime copyFn: fn (*KeyType, *KeyType) void,
     comptime freeFn: fn (*std.mem.Allocator, *KeyType) void,
-    comptime nextFn_opt: ?fn (*std.mem.Allocator, *KeyType) anyerror!void,
-    //
-    comptime Context: type,
+    comptime nextFn_opt: ?fn (*std.mem.Allocator, *KeyType, *Context) anyerror!void,
     //
     comptime detectSafetyFn: fn ([]const u8) Safety,
     //
@@ -134,7 +134,7 @@ pub fn Cipher(
                     /// For integer keys this will go 1,2,3,... 
                     /// However, some will have more complex patterns.
                     pub fn next(self: *Self) !void {
-                        try nextFn(self.allocator, &self.v);
+                        try nextFn(self.allocator, &self.v, &self.context);
                     }
                 } else struct {};
             };

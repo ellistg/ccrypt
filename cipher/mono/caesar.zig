@@ -1,7 +1,9 @@
 const std = @import("std");
 const cipher = @import("../../cipher.zig");
 
-fn nextFn(_: *std.mem.Allocator, key: *u5) !void {
+const Context = cipher.VoidContext;
+
+fn nextFn(_: *std.mem.Allocator, key: *u5, _: *Context) !void {
     if (key.* >= 25) {
         return error.InvalidKey;
     } else {
@@ -19,8 +21,8 @@ fn copyFn(a: *u5, b: *u5) void {
 
 fn freeFn(_: *std.mem.Allocator, _: *u5) void {}
 
+// always strips text, will check if this causes significant performance impact.
 fn detectSafetyFn(_: []const u8) cipher.Safety {
-    // TODO is it worth checking if it needs stripping or just doing it regardless?
     return .UnsafeAfterStrip;
 }
 
@@ -53,13 +55,13 @@ fn decryptSFn(text: []const u8, key: u5, _: void, output: []u8) void {
 }
 
 pub usingnamespace cipher.Cipher(
+    Context,
+    //
     u5,
     dupeFn,
     copyFn,
     freeFn,
     nextFn,
-    //
-    cipher.VoidContext,
     //
     detectSafetyFn,
     //
@@ -67,6 +69,6 @@ pub usingnamespace cipher.Cipher(
     encryptFn,
     decryptSFn,
     encryptSFn,
-
+    //
     .Mono,
 );
