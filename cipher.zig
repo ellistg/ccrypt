@@ -5,6 +5,7 @@ const method = struct {
     pub const brute = @import("method/brute.zig").brute;
 };
 
+/// Comptime interface to generate the type for each cipher.
 pub fn Cipher(
     comptime KeyType: type,
     comptime dupeFn: fn (*std.mem.Allocator, KeyType) std.mem.Allocator.Error!KeyType,
@@ -27,16 +28,16 @@ pub fn Cipher(
         pub const Key = struct {
             pub const Type = KeyType;
 
-            // Struct containing all data and functions needed to decode/encode
-            // a ciphertext/plaintext. This type should be used as the test key
-            // for any method.
+            /// All data and functions needed to decode/encode a 
+            /// ciphertext/plaintext. This type should be used as the test key
+            /// for any method.
             pub const Full = struct {
                 v: KeyType,
                 context: Context,
 
                 text: []align(textAlign) const u8,
                 buf: []align(textAlign) u8,
-                freeText: bool,
+                freeText: bool, // If true `text` must be freed on `deinit`
 
                 cryptFn: fn ([]const u8, KeyType, Context.Type, []u8) void,
                 fitness: analysis.Fitness,
@@ -46,6 +47,8 @@ pub fn Cipher(
 
                 const Self = @This();
 
+                /// Initialize a Full Key, providing all data it could need.
+                /// This is stored so that in code optimisatoins may be applied.
                 pub fn init(
                     allocator: *std.mem.Allocator,
                     fitness: *analysis.Fitness,
@@ -101,20 +104,24 @@ pub fn Cipher(
                     };
                 }
 
+                /// Release all data stored by the Full Key.
                 pub fn deinit(self: *Self) void {
                     freeFn(self.allocator, &self.v);
                     self.context.deinit();
                     if (self.freeText) self.allocator.free(self.text);
                 }
 
+                /// [En|De]crypt the text using the current key value.
                 pub fn crypt(self: *Self) void {
                     self.cryptFn(self.text, self.v, self.context.v, self.buf);
                 }
 
+                /// Calculate the fitness for `buf` as per settings defined in `init`.
                 pub fn bufFit(self: *const Self) f32 {
                     return self.fitness.calc(self.buf);
                 }
 
+                /// Copy passed value to `v` - may cause allocations.
                 pub fn copy(self: *Self, key: *KeyType) void {
                     copyFn(&self.v, key);
                 }
@@ -123,14 +130,17 @@ pub fn Cipher(
                 // in the key, resulting compile error rather than unresolved bug if
                 // a cipher is used in an attack method that requires it.
                 pub usingnamespace if (nextFn_opt) |nextFn| struct {
+                    /// Transform `v` to be the next key in the sequence.
+                    /// For integer keys this will go 1,2,3,... 
+                    /// However, some will have more complex patterns.
                     pub fn next(self: *Self) !void {
                         try nextFn(self.allocator, &self.v);
                     }
                 } else struct {};
             };
 
-            // Struct only containing key data needed to describe the final
-            // result of an attack, used as return type by all methods.
+            /// Key data needed to describe the final result of an attack, used 
+            /// as return type by all methods.
             pub const Basic = struct {
                 v: KeyType,
                 context: Context,
@@ -140,6 +150,7 @@ pub fn Cipher(
 
                 const Self = @This();
 
+                /// [En|De]crypt the text using the current key value.
                 pub fn init(
                     allocator: *std.mem.Allocator,
                     key: KeyType,
@@ -152,20 +163,27 @@ pub fn Cipher(
                     };
                 }
 
+                /// Release all data stored by the Full Key.
                 pub fn deinit(self: *Self) void {
                     freeFn(self.allocator, &self.v);
                     self.context.deinit();
                 }
 
+                /// Copy passed value to `v` - may cause allocations.
                 pub fn copy(self: *Self, key: *KeyType) void {
                     copyFn(&self.v, key);
                 }
             };
         };
 
-        pub const kind = kind_val;
-        pub const CipherImpl = @This();
+        // Would be self however that would create shadow of `Self` in
+        // `Key.Full` and `Key.Basic`.
+        const CipherImpl = @This();
 
+        pub const kind = kind_val;
+
+        /// Easily [en|de]crypts data passed in, does not generate key and 
+        /// always runs methods in safe mode.
         pub fn crypt(
             allocator: *std.mem.Allocator,
             cryptE: Crypt,
@@ -185,16 +203,18 @@ pub fn Cipher(
             return buf;
         }
 
+        // Determines if `Key.Full` has the methods needed to run a brute force.
         pub usingnamespace if (@hasDecl(Key.Full, "next")) struct {
+            /// Brute forces every key within range specified when calling.
             pub const brute = method.brute(CipherImpl);
         } else struct {};
     };
 }
 
-// Use 512-bit vectors in order to make best use of modern CPUs (eg. AVX-512)
+/// Alignment to use 512-bit vectors in order to make best use of modern CPUs (eg. AVX-512)
 pub const textAlign = @alignOf(std.meta.Vector(512 / 8, u8));
 
-// Use for `Context` in Cipher if none is needed.
+/// Context to use in `Cipher` if one isn't needed.
 pub const VoidContext = struct {
     v: void = {},
 
@@ -208,9 +228,22 @@ pub const VoidContext = struct {
     pub fn deinit(_: *Self) void {}
 };
 
+/// Describes the category of cipher that is generated by `Cipher`.
 pub const Kind = enum { Mono, Trans, Poly, Homo };
+
+/// Used as input for functions to determine whether text is meant to be
+/// encrypted or decrypted. 
+/// Used instead of bool to improve readability when using this library.
 pub const Crypt = enum { Decrypt, Encrypt };
-pub const Safety = enum { Safe, Unsafe, UnsafeAfterStrip };
+
+/// Determines how an decrypt methods and fitness functions should be 
+/// used.
+pub const Safety = enum {
+    Safe, // crypt and fitness functions should work on any input
+    Unsafe, // crypt and fitness functions work on lowercase alphabetic input
+    // crypt and fitness functions work on lowercase alphabetic input after sanitisation
+    UnsafeAfterStrip,
+};
 
 // Namespace containing all purely monoalphabetic ciphers.
 usingnamespace @import("cipher/mono.zig");
