@@ -1,8 +1,6 @@
 const std = @import("std");
 const cipher = @import("../../cipher.zig");
 
-// TODO implement safe varients
-
 fn nextFn(_: *std.mem.Allocator, key: *u5) !void {
     if (key.* >= 25) {
         return error.InvalidKey;
