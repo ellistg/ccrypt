@@ -10,8 +10,8 @@ pub fn Cipher(
     comptime Context: type,
     //
     comptime KeyType: type,
-    comptime dupeFn: fn (*std.mem.Allocator, KeyType) std.mem.Allocator.Error!KeyType,
-    comptime copyFn: fn (*KeyType, *KeyType) void,
+    comptime dupeFn: fn (*std.mem.Allocator, KeyType) anyerror!KeyType,
+    comptime copyFn: fn (*KeyType, *KeyType) anyerror!void,
     comptime freeFn: fn (*std.mem.Allocator, *KeyType) void,
     comptime nextFn_opt: ?fn (*std.mem.Allocator, *KeyType, *Context) anyerror!void,
     //
@@ -168,8 +168,8 @@ pub fn Cipher(
                 }
 
                 /// Copy passed value to `v` - may cause allocations.
-                pub fn copy(self: *Self, key: *KeyType) void {
-                    copyFn(&self.v, key);
+                pub fn copy(self: *Self, key: *KeyType) !void {
+                    try copyFn(&self.v, key);
                 }
             };
         };
@@ -242,6 +242,7 @@ pub const Safety = enum {
 
 // Namespace containing all purely monoalphabetic ciphers.
 usingnamespace @import("cipher/mono.zig");
+usingnamespace @import("cipher/trans.zig");
 
 test {
     std.testing.refAllDecls(@This());

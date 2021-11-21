@@ -39,7 +39,7 @@ pub fn brute(
 
                 if (key.fitness.cmp(test_fit, best_fit)) {
                     best_fit = test_fit;
-                    best.copy(&key.v);
+                    try best.copy(&key.v);
                 }
 
                 count += 1;
