@@ -33,6 +33,11 @@ pub fn Cipher(
                 return idxFn(allocator, key);
             }
 
+            /// Copy passed value to `v` - may cause allocations.
+            pub fn copy(a: *KeyType, b: *KeyType) !void {
+                try copyFn(a, b);
+            }
+
             /// All data and functions needed to decode/encode a 
             /// ciphertext/plaintext. This type should be used as the test key
             /// for any method.
@@ -45,7 +50,7 @@ pub fn Cipher(
                 freeText: bool, // If true `text` must be freed on `deinit`
 
                 cryptFn: fn ([]const u8, KeyType, Context.Type, []u8) void,
-                fitness: analysis.Fitness,
+                fit: analysis.Fitness,
 
                 // Not used by every cipher but always stored for simplicity of lib
                 allocator: *std.mem.Allocator,
@@ -56,7 +61,7 @@ pub fn Cipher(
                 /// This is stored so that in code optimisatoins may be applied.
                 pub fn init(
                     allocator: *std.mem.Allocator,
-                    fitness: *analysis.Fitness,
+                    fit: *analysis.Fitness,
                     cryptE: Crypt,
                     key: KeyType,
                     text: []align(textAlign) const u8,
@@ -64,7 +69,7 @@ pub fn Cipher(
                     const safety = detectSafetyFn(text);
 
                     if (safety != .Safe) {
-                        fitness.*.safe(false);
+                        fit.*.safe(false);
                     }
 
                     var textF = text;
@@ -103,7 +108,7 @@ pub fn Cipher(
                         .text = textF,
                         .buf = buf,
                         .freeText = free,
-                        .fitness = fitness.*,
+                        .fit = fit.*,
                         .cryptFn = cryptFn,
                         .allocator = allocator,
                     };
@@ -119,16 +124,6 @@ pub fn Cipher(
                 /// [En|De]crypt the text using the current key value.
                 pub fn crypt(self: *Self) void {
                     self.cryptFn(self.text, self.v, self.context.v, self.buf);
-                }
-
-                /// Calculate the fitness for `buf` as per settings defined in `init`.
-                pub fn bufFit(self: *const Self) f32 {
-                    return self.fitness.calc(self.buf);
-                }
-
-                /// Copy passed value to `v` - may cause allocations.
-                pub fn copy(self: *Self, key: *KeyType) void {
-                    copyFn(&self.v, key);
                 }
 
                 // If no pointer is provided for nextFn there will be no next function
@@ -171,11 +166,6 @@ pub fn Cipher(
                 /// Release all data stored by the Full Key.
                 pub fn deinit(self: *Self) void {
                     freeFn(self.allocator, &self.v);
-                }
-
-                /// Copy passed value to `v` - may cause allocations.
-                pub fn copy(self: *Self, key: *KeyType) !void {
-                    try copyFn(&self.v, key);
                 }
             };
         };

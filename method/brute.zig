@@ -16,30 +16,30 @@ pub fn brute(
     return struct {
         pub fn brute(
             allocator: *std.mem.Allocator,
-            fitness: *analysis.Fitness,
+            fit: *analysis.Fitness,
             crypt: cipher.Crypt,
             text: []align(cipher.textAlign) const u8,
             start_key: Cipher.Key.Type,
             num_iter: usize,
         ) !Cipher.Key.Basic {
-            var key = try Cipher.Key.Full.init(allocator, fitness, crypt, start_key, text);
+            var key = try Cipher.Key.Full.init(allocator, fit, crypt, start_key, text);
             defer key.deinit();
 
             var best = try Cipher.Key.Basic.init(allocator, start_key, text);
             errdefer best.deinit();
 
-            var best_fit: f32 = key.fitness.calc(text);
+            var best_fit: f32 = key.fit.calc(text);
 
             var count: usize = 0;
             while (count < num_iter) {
                 try key.next();
 
                 key.crypt();
-                const test_fit: f32 = key.bufFit();
+                const test_fit: f32 = key.fit.calc(key.buf);
 
-                if (key.fitness.cmp(test_fit, best_fit)) {
+                if (key.fit.cmp(test_fit, best_fit)) {
                     best_fit = test_fit;
-                    try best.copy(&key.v);
+                    try Cipher.Key.copy(&best.v, &key.v);
                 }
 
                 count += 1;
