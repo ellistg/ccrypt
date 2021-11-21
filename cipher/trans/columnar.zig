@@ -27,6 +27,64 @@ const Context = struct {
     }
 };
 
+fn dupeFn(allocator: *std.mem.Allocator, key: KeyType) !KeyType {
+    var new = try KeyType.initCapacity(allocator, key.items.len);
+    new.appendSliceAssumeCapacity(key.items);
+
+    return new;
+}
+
+fn copyFn(a: *KeyType, b: *KeyType) !void {
+    try a.ensureTotalCapacity(b.items.len);
+    a.items.len = b.items.len;
+    std.mem.copy(u8, a.items, b.items);
+}
+
+fn factorial(num: usize) usize {
+    if (num == 0 or num == 1) {
+        return 1;
+    } else {
+        return num * factorial(num - 1);
+    }
+}
+
+fn sliceSearch(slice: []const u8, item: u8) ?usize {
+    for (slice) |val, pos| {
+        if (val == item) {
+            return pos;
+        }
+    }
+    return null;
+}
+
+fn idxFn(allocator: *std.mem.Allocator, key: KeyType) !usize {
+    var unused = KeyType.init(allocator);
+    defer unused.deinit();
+
+    var i: u8 = 0;
+    while (i < key.items.len) : (i += 1) {
+        try unused.append(i);
+    }
+
+    var key_idx: usize = 0;
+    for (key.items) |item, idx| {
+        const unused_idx = sliceSearch(unused.items, item).?;
+        key_idx += factorial(key.items.len - idx - 1) * unused_idx;
+        _ = unused.orderedRemove(unused_idx);
+    }
+
+    i = 2;
+    while (i < key.items.len) : (i += 1) {
+        key_idx += factorial(i);
+    }
+
+    return key_idx;
+}
+
+fn freeFn(_: *std.mem.Allocator, key: *KeyType) void {
+    key.deinit();
+}
+
 /// Finds the next lexicographical permutation of the key.
 /// If the last permutation for a given length is found the first for the next 
 /// length will be returned.
@@ -66,23 +124,6 @@ fn nextFn(allocator: *std.mem.Allocator, key: *KeyType, context: *Context) !void
     std.mem.reverse(u8, key.items[i..]);
 }
 
-fn dupeFn(allocator: *std.mem.Allocator, key: KeyType) !KeyType {
-    var new = try KeyType.initCapacity(allocator, key.items.len);
-    new.appendSliceAssumeCapacity(key.items);
-
-    return new;
-}
-
-fn copyFn(a: *KeyType, b: *KeyType) !void {
-    try a.ensureTotalCapacity(b.items.len);
-    a.items.len = b.items.len;
-    std.mem.copy(u8, a.items, b.items);
-}
-
-fn freeFn(_: *std.mem.Allocator, key: *KeyType) void {
-    key.deinit();
-}
-
 // TODO implement this
 fn detectSafetyFn(_: []const u8) cipher.Safety {
     return .Safe;
@@ -117,6 +158,7 @@ pub usingnamespace cipher.Cipher(
     KeyType,
     dupeFn,
     copyFn,
+    idxFn,
     freeFn,
     nextFn,
     //

@@ -3,6 +3,20 @@ const cipher = @import("../../cipher.zig");
 
 const Context = cipher.VoidContext;
 
+fn dupeFn(_: *std.mem.Allocator, key: u5) !u5 {
+    return key;
+}
+
+fn copyFn(a: *u5, b: *u5) !void {
+    a.* = b.*;
+}
+
+fn idxFn(_: *std.mem.Allocator, key: u5) !usize {
+    return key;
+}
+
+fn freeFn(_: *std.mem.Allocator, _: *u5) void {}
+
 fn nextFn(_: *std.mem.Allocator, key: *u5, _: *Context) !void {
     if (key.* >= 25) {
         return error.InvalidKey;
@@ -10,16 +24,6 @@ fn nextFn(_: *std.mem.Allocator, key: *u5, _: *Context) !void {
         key.* += 1;
     }
 }
-
-fn dupeFn(_: *std.mem.Allocator, key: u5) !u5 {
-    return key;
-}
-
-fn copyFn(a: *u5, b: *u5) void {
-    a.* = b.*;
-}
-
-fn freeFn(_: *std.mem.Allocator, _: *u5) void {}
 
 // always strips text, will check if this causes significant performance impact.
 fn detectSafetyFn(_: []const u8) cipher.Safety {
@@ -60,6 +64,7 @@ pub usingnamespace cipher.Cipher(
     u5,
     dupeFn,
     copyFn,
+    idxFn,
     freeFn,
     nextFn,
     //

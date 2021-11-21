@@ -12,6 +12,7 @@ pub fn Cipher(
     comptime KeyType: type,
     comptime dupeFn: fn (*std.mem.Allocator, KeyType) anyerror!KeyType,
     comptime copyFn: fn (*KeyType, *KeyType) anyerror!void,
+    comptime idxFn: fn (*std.mem.Allocator, KeyType) anyerror!usize,
     comptime freeFn: fn (*std.mem.Allocator, *KeyType) void,
     comptime nextFn_opt: ?fn (*std.mem.Allocator, *KeyType, *Context) anyerror!void,
     //
@@ -27,6 +28,10 @@ pub fn Cipher(
     return struct {
         pub const Key = struct {
             pub const Type = KeyType;
+
+            pub fn idx(allocator: *std.mem.Allocator, key: KeyType) !usize {
+                return idxFn(allocator, key);
+            }
 
             /// All data and functions needed to decode/encode a 
             /// ciphertext/plaintext. This type should be used as the test key
