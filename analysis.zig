@@ -121,7 +121,7 @@ fn getAlphCount(text: []const u8, step: usize) [26]f32 {
     var alph_counts = std.mem.zeroes([26]f32);
     var i: usize = 0;
     while (i < text.len) : (i += step) {
-        const alpha = text[i] - 'a';
+        const alpha = (text[i] & 31) - 1;
         alph_counts[alpha] += 1;
     }
 
