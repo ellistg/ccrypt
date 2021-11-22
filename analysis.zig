@@ -306,7 +306,8 @@ fn biFitness(text: []const u8, step: usize) f32 {
     const coef = std.meta.Vector(2, u32){ 26, 1 };
     while (i < text.len - 1) : (i += step) {
         const bg8: std.meta.Vector(2, u8) = text[i..][0..2].*;
-        const bg: std.meta.Vector(2, u32) = bg8 - @splat(2, @as(u8, 'a'));
+        const bgn: std.meta.Vector(2, u8) = bg8 & @splat(2, @as(u8, 31));
+        const bg: std.meta.Vector(2, u32) = bgn - @splat(2, @as(u8, 1));
         const pos = @reduce(.Add, bg * coef);
         fitness += bigrams[pos];
     }
@@ -322,7 +323,7 @@ fn biFitnessS(text: []const u8, step: usize) f32 {
 
     while (i < text.len - 1) : (i += 1) {
         if (std.ascii.isAlpha(text[i])) {
-            pair[0] = (text[i] & 31) - 1 + 'a';
+            pair[0] = (text[i] & 31) - 1;
             break;
         }
     }
@@ -332,10 +333,10 @@ fn biFitnessS(text: []const u8, step: usize) f32 {
         if (std.ascii.isAlpha(text[i])) {
             step_count += 1;
             if (step_count == step) {
-                pair[1] = (text[i] & 31) - 1 + 'a';
+                pair[1] = (text[i] & 31) - 1;
 
                 const bg8: std.meta.Vector(2, u8) = pair;
-                const bg: std.meta.Vector(2, u32) = bg8 - @splat(2, @as(u8, 'a'));
+                const bg: std.meta.Vector(2, u32) = bg8;
                 const pos = @reduce(.Add, bg * coef);
                 fitness += bigrams[pos];
 
@@ -385,7 +386,8 @@ fn quadFitness(text: []const u8, step: usize) f32 {
     const coef = std.meta.Vector(4, u32){ 17576, 676, 26, 1 };
     while (i < text.len - 3) : (i += step) {
         const qg8: std.meta.Vector(4, u8) = text[i..][0..4].*;
-        const qg: std.meta.Vector(4, u32) = qg8 - @splat(4, @as(u8, 'a'));
+        const qgn: std.meta.Vector(4, u8) = qg8 & @splat(4, @as(u8, 31));
+        const qg: std.meta.Vector(4, u32) = qgn - @splat(4, @as(u8, 1));
         const pos = @reduce(.Add, qg * coef);
         fitness += quadgrams[pos];
     }
@@ -402,7 +404,7 @@ fn quadFitnessS(text: []const u8, step: usize) f32 {
     inline for (.{ 0, 1, 2 }) |pos| {
         while (i < text.len - 1) : (i += 1) {
             if (std.ascii.isAlpha(text[i])) {
-                quad[pos] = (text[i] & 31) - 1 + 'a';
+                quad[pos] = (text[i] & 31) - 1;
                 break;
             }
         }
@@ -413,10 +415,10 @@ fn quadFitnessS(text: []const u8, step: usize) f32 {
         if (std.ascii.isAlpha(text[i])) {
             step_count += 1;
             if (step_count == step) {
-                quad[3] = (text[i] & 31) - 1 + 'a';
+                quad[3] = (text[i] & 31) - 1;
 
                 const qg8: std.meta.Vector(4, u8) = quad;
-                const qg: std.meta.Vector(4, u32) = qg8 - @splat(4, @as(u8, 'a'));
+                const qg: std.meta.Vector(4, u32) = qg8;
                 const pos = @reduce(.Add, qg * coef);
                 fitness += quadgrams[pos];
 
