@@ -32,7 +32,7 @@ fn detectSafetyFn(_: []const u8) cipher.Safety {
 
 fn encryptFn(text: []const u8, key: u5, _: void, output: []u8) void {
     for (text) |char, idx| {
-        output[idx] = (char - 'a' + key) % 26 + 'a';
+        output[idx] = ((char & 31) - 1 + key) % 26 + 'a';
     }
 }
 
@@ -43,11 +43,7 @@ fn decryptFn(text: []const u8, key: u5, _: void, output: []u8) void {
 fn encryptSFn(text: []const u8, key: u5, _: void, output: []u8) void {
     for (text) |char, idx| {
         if (std.ascii.isAlpha(char)) {
-            if (std.ascii.isLower(char)) {
-                output[idx] = (char - 'a' + key) % 26 + 'a';
-            } else {
-                output[idx] = (char - 'A' + key) % 26 + 'A';
-            }
+            output[idx] = ((char & 31) - 1 + key) % 26 + 'a';
         } else {
             output[idx] = char;
         }
