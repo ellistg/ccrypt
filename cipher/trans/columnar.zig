@@ -1,9 +1,7 @@
 const std = @import("std");
 const cipher = @import("../../cipher.zig");
 
-const KeyType = std.ArrayList(u8);
-
-const Context = struct {
+pub const Context = struct {
     v: Type,
 
     pub const Type = struct {
@@ -26,15 +24,18 @@ const Context = struct {
         return Context{ .v = .{ .chunk = text.len / key_slice.len, .over = text.len % key_slice.len, .text_len = text.len, .key_len = key_slice.len } };
     }
 };
+pub const KeyType = std.ArrayList(u8);
 
-fn dupeFn(allocator: *std.mem.Allocator, key: KeyType) !KeyType {
+pub const Kind = cipher.Kind{.Mono};
+
+pub fn dupe(allocator: *std.mem.Allocator, key: KeyType) !KeyType {
     var new = try KeyType.initCapacity(allocator, key.items.len);
     new.appendSliceAssumeCapacity(key.items);
 
     return new;
 }
 
-fn copyFn(a: *KeyType, b: *KeyType) !void {
+pub fn copy(a: *KeyType, b: *KeyType) !void {
     try a.ensureTotalCapacity(b.items.len);
     a.items.len = b.items.len;
     std.mem.copy(u8, a.items, b.items);
@@ -57,7 +58,7 @@ fn sliceSearch(slice: []const u8, item: u8) ?usize {
     return null;
 }
 
-fn idxFn(allocator: *std.mem.Allocator, key: KeyType) !usize {
+pub fn index(allocator: *std.mem.Allocator, key: KeyType) !usize {
     var unused = KeyType.init(allocator);
     defer unused.deinit();
 
@@ -81,14 +82,14 @@ fn idxFn(allocator: *std.mem.Allocator, key: KeyType) !usize {
     return key_idx;
 }
 
-fn freeFn(_: *std.mem.Allocator, key: *KeyType) void {
+pub fn free(_: *std.mem.Allocator, key: *KeyType) void {
     key.deinit();
 }
 
 /// Finds the next lexicographical permutation of the key.
 /// If the last permutation for a given length is found the first for the next 
 /// length will be returned.
-fn nextFn(allocator: *std.mem.Allocator, key: *KeyType, context: *Context) !void {
+pub fn next(allocator: *std.mem.Allocator, key: *KeyType, context: *Context) !void {
     var i = key.items.len - 2;
 
     while (i >= 0) : (i -= 1) {
@@ -125,22 +126,11 @@ fn nextFn(allocator: *std.mem.Allocator, key: *KeyType, context: *Context) !void
 }
 
 // TODO implement this
-fn detectSafetyFn(_: []const u8) cipher.Safety {
+pub fn detectSafety(_: []const u8) cipher.Safety {
     return .Safe;
 }
 
-fn encryptFn(text: []const u8, key: KeyType, _: void, output: []u8) void {
-    for (text) |char, idx| {
-        output[idx] = (char - 'a' + key) % 26 + 'a';
-    }
-}
-
-fn decrypt(
-    text: []const u8,
-    key: KeyType,
-    context: Context.Type,
-    output: []u8,
-) void {
+pub fn decrypt(text: []const u8, key: KeyType, context: Context.Type, output: []u8) void {
     var offset: usize = 0;
     for (key.items) |idx| {
         const this_chunk = context.chunk + @boolToInt(idx < context.over);
@@ -152,22 +142,14 @@ fn decrypt(
     }
 }
 
-pub usingnamespace cipher.Cipher(
-    Context,
-    //
-    KeyType,
-    dupeFn,
-    copyFn,
-    idxFn,
-    freeFn,
-    nextFn,
-    //
-    detectSafetyFn,
-    //
-    decrypt,
-    decrypt,
-    decrypt,
-    decrypt,
-    //
-    .Trans,
-);
+pub fn decryptS(text: []const u8, key: KeyType, context: Context.Type, output: []u8) void {
+    decrypt(text, key, context, output);
+}
+
+pub fn encrypt(text: []const u8, key: KeyType, context: Context.Type, output: []u8) void {
+    decrypt(text, key, context, output);
+}
+
+pub fn encryptS(text: []const u8, key: KeyType, context: Context.Type, output: []u8) void {
+    decrypt(text, key, context, output);
+}

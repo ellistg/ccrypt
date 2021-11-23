@@ -6,50 +6,32 @@ const method = struct {
 };
 
 /// Comptime interface to generate the type for each cipher.
-pub fn Cipher(
-    comptime Context: type,
-    //
-    comptime KeyType: type,
-    comptime dupeFn: fn (*std.mem.Allocator, KeyType) anyerror!KeyType,
-    comptime copyFn: fn (*KeyType, *KeyType) anyerror!void,
-    comptime idxFn: fn (*std.mem.Allocator, KeyType) anyerror!usize,
-    comptime freeFn: fn (*std.mem.Allocator, *KeyType) void,
-    comptime nextFn_opt: ?fn (*std.mem.Allocator, *KeyType, *Context) anyerror!void,
-    //
-    comptime detectSafetyFn: fn ([]const u8) Safety,
-    //
-    comptime decrypt: fn ([]const u8, KeyType, Context.Type, []u8) void,
-    comptime encrypt: fn ([]const u8, KeyType, Context.Type, []u8) void,
-    comptime decryptS: fn ([]const u8, KeyType, Context.Type, []u8) void,
-    comptime encryptS: fn ([]const u8, KeyType, Context.Type, []u8) void,
-    //
-    comptime kind_val: Kind,
-) type {
+pub fn Cipher(comptime Impl: type) type {
     return struct {
         pub const Key = struct {
-            pub const Type = KeyType;
+            pub const Type = Impl.KeyType;
 
-            pub fn idx(allocator: *std.mem.Allocator, key: KeyType) !usize {
-                return idxFn(allocator, key);
+            pub fn idx(allocator: *std.mem.Allocator, key: Impl.KeyType) !usize {
+                return Impl.index(allocator, key);
             }
 
             /// Copy passed value to `v` - may cause allocations.
-            pub fn copy(a: *KeyType, b: *KeyType) !void {
-                try copyFn(a, b);
+            pub fn copy(a: *Impl.KeyType, b: *Impl.KeyType) !void {
+                try Impl.copy(a, b);
             }
 
             /// All data and functions needed to decode/encode a 
             /// ciphertext/plaintext. This type should be used as the test key
             /// for any method.
             pub const Full = struct {
-                v: KeyType,
-                context: Context,
+                v: Impl.KeyType,
+                context: Impl.Context,
 
                 text: []align(textAlign) const u8,
                 buf: []align(textAlign) u8,
                 freeText: bool, // If true `text` must be freed on `deinit`
 
-                cryptFn: fn ([]const u8, KeyType, Context.Type, []u8) void,
+                cryptFn: fn ([]const u8, Impl.KeyType, Impl.Context.Type, []u8) void,
                 fit: analysis.Fitness,
 
                 // Not used by every cipher but always stored for simplicity of lib
@@ -63,10 +45,10 @@ pub fn Cipher(
                     allocator: *std.mem.Allocator,
                     fit: *analysis.Fitness,
                     cryptE: Crypt,
-                    key: KeyType,
+                    key: Impl.KeyType,
                     text: []align(textAlign) const u8,
                 ) std.mem.Allocator.Error!Self {
-                    const safety = detectSafetyFn(text);
+                    const safety = Impl.detectSafety(text);
 
                     if (safety != .Safe) {
                         fit.*.safe(false);
@@ -93,18 +75,18 @@ pub fn Cipher(
 
                     const cryptFn = switch (safety) {
                         .Safe => switch (cryptE) {
-                            .Encrypt => encryptS,
-                            .Decrypt => decryptS,
+                            .Encrypt => Impl.encryptS,
+                            .Decrypt => Impl.decryptS,
                         },
                         .Unsafe, .UnsafeAfterStrip => switch (cryptE) {
-                            .Encrypt => encrypt,
-                            .Decrypt => decrypt,
+                            .Encrypt => Impl.encrypt,
+                            .Decrypt => Impl.decrypt,
                         },
                     };
 
                     return Self{
-                        .v = try dupeFn(allocator, key),
-                        .context = Context.init(key, text),
+                        .v = try Impl.dupe(allocator, key),
+                        .context = Impl.Context.init(key, text),
                         .text = textF,
                         .buf = buf,
                         .freeText = free,
@@ -116,7 +98,7 @@ pub fn Cipher(
 
                 /// Release all data stored by the Full Key.
                 pub fn deinit(self: *Self) void {
-                    freeFn(self.allocator, &self.v);
+                    Impl.free(self.allocator, &self.v);
                     self.allocator.free(self.buf);
                     if (self.freeText) self.allocator.free(self.text);
                 }
@@ -129,12 +111,12 @@ pub fn Cipher(
                 // If no pointer is provided for nextFn there will be no next function
                 // in the key, resulting compile error rather than unresolved bug if
                 // a cipher is used in an attack method that requires it.
-                pub usingnamespace if (nextFn_opt) |nextFn| struct {
+                pub usingnamespace if (@hasDecl(Impl, "next")) struct {
                     /// Transform `v` to be the next key in the sequence.
                     /// For integer keys this will go 1,2,3,... 
                     /// However, some will have more complex patterns.
                     pub fn next(self: *Self) !void {
-                        try nextFn(self.allocator, &self.v, &self.context);
+                        try Impl.next(self.allocator, &self.v, &self.context);
                     }
                 } else struct {};
             };
@@ -142,8 +124,8 @@ pub fn Cipher(
             /// Key data needed to describe the final result of an attack, used 
             /// as return type by all methods.
             pub const Basic = struct {
-                v: KeyType,
-                context: Context,
+                v: Impl.KeyType,
+                context: Impl.Context,
 
                 // Not used by every cipher but always stored for simplicity of lib
                 allocator: *std.mem.Allocator,
@@ -153,19 +135,19 @@ pub fn Cipher(
                 /// [En|De]crypt the text using the current key value.
                 pub fn init(
                     allocator: *std.mem.Allocator,
-                    key: KeyType,
+                    key: Impl.KeyType,
                     text: []const u8,
                 ) std.mem.Allocator.Error!Self {
                     return Self{
-                        .v = try dupeFn(allocator, key),
-                        .context = Context.init(key, text),
+                        .v = try Impl.dupe(allocator, key),
+                        .context = Impl.Context.init(key, text),
                         .allocator = allocator,
                     };
                 }
 
                 /// Release all data stored by the Full Key.
                 pub fn deinit(self: *Self) void {
-                    freeFn(self.allocator, &self.v);
+                    Impl.free(self.allocator, &self.v);
                 }
             };
         };
@@ -174,7 +156,7 @@ pub fn Cipher(
         // `Key.Full` and `Key.Basic`.
         const CipherImpl = @This();
 
-        pub const kind = kind_val;
+        pub const kind = Impl.Kind;
 
         /// Easily [en|de]crypts data passed in, does not generate key and 
         /// always runs methods in safe mode.
@@ -182,15 +164,15 @@ pub fn Cipher(
             allocator: *std.mem.Allocator,
             cryptE: Crypt,
             text: []const u8,
-            key: KeyType,
+            key: Impl.KeyType,
         ) ![]u8 {
             const cryptFn = switch (cryptE) {
-                .Encrypt => encryptS,
-                .Decrypt => decryptS,
+                .Encrypt => Impl.encryptS,
+                .Decrypt => Impl.decryptS,
             };
 
             const buf = try allocator.alloc(u8, text.len);
-            var context = Context.init(key, text);
+            var context = Impl.Context.init(key, text);
             cryptFn(text, key, context.v, buf);
 
             return buf;
@@ -237,8 +219,10 @@ pub const Safety = enum {
 };
 
 // Namespace containing all purely monoalphabetic ciphers.
-usingnamespace @import("cipher/mono.zig");
-usingnamespace @import("cipher/trans.zig");
+pub const caesar = Cipher(@import("cipher/mono/caesar.zig"));
+pub const columnar = Cipher(@import("cipher/trans/columnar.zig"));
+// usingnamespace @import("cipher/mono.zig");
+// usingnamespace @import("cipher/trans.zig");
 
 test {
     std.testing.refAllDecls(@This());

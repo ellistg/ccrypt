@@ -3,7 +3,7 @@ const std = @import("std");
 const bigrams = @import("analysis/bigrams.zig").bigram_log_freq;
 const quadgrams = @import("analysis/quadgrams.zig").quadgram_log_freq;
 
-const crypt = @import("cipher/mono/caesar.zig").crypt;
+const crypt = @import("cipher.zig").caesar.crypt;
 const test_allocator = std.testing.allocator;
 
 const s_eng =

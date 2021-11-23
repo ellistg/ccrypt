@@ -1,23 +1,26 @@
 const std = @import("std");
 const cipher = @import("../../cipher.zig");
 
-const Context = cipher.VoidContext;
+pub const Context = cipher.VoidContext;
+pub const KeyType = u5;
 
-fn dupeFn(_: *std.mem.Allocator, key: u5) !u5 {
+pub const Kind = cipher.Kind{.Mono};
+
+pub fn dupe(_: *std.mem.Allocator, key: KeyType) !KeyType {
     return key;
 }
 
-fn copyFn(a: *u5, b: *u5) !void {
+pub fn copy(a: *KeyType, b: *KeyType) !void {
     a.* = b.*;
 }
 
-fn idxFn(_: *std.mem.Allocator, key: u5) !usize {
+pub fn index(_: *std.mem.Allocator, key: KeyType) !usize {
     return key;
 }
 
-fn freeFn(_: *std.mem.Allocator, _: *u5) void {}
+pub fn free(_: *std.mem.Allocator, _: *KeyType) void {}
 
-fn nextFn(_: *std.mem.Allocator, key: *u5, _: *Context) !void {
+pub fn next(_: *std.mem.Allocator, key: *KeyType, _: *Context) !void {
     if (key.* >= 25) {
         return error.InvalidKey;
     } else {
@@ -25,22 +28,22 @@ fn nextFn(_: *std.mem.Allocator, key: *u5, _: *Context) !void {
     }
 }
 
-// always strips text, will check if this causes significant performance impact.
-fn detectSafetyFn(_: []const u8) cipher.Safety {
+pub fn detectSafety(_: []const u8) cipher.Safety {
+    // TODO Implement This
     return .UnsafeAfterStrip;
 }
 
-fn encryptFn(text: []const u8, key: u5, _: void, output: []u8) void {
+pub fn encrypt(text: []const u8, key: KeyType, _: void, output: []u8) void {
     for (text) |char, idx| {
         output[idx] = ((char & 31) - 1 + key) % 26 + 'a';
     }
 }
 
-fn decryptFn(text: []const u8, key: u5, _: void, output: []u8) void {
-    encryptFn(text, 26 - key, {}, output);
+pub fn decrypt(text: []const u8, key: KeyType, _: void, output: []u8) void {
+    encrypt(text, 26 - key, {}, output);
 }
 
-fn encryptSFn(text: []const u8, key: u5, _: void, output: []u8) void {
+pub fn encryptS(text: []const u8, key: KeyType, _: void, output: []u8) void {
     for (text) |char, idx| {
         if (std.ascii.isAlpha(char)) {
             output[idx] = ((char & 31) - 1 + key) % 26 + 'a';
@@ -50,26 +53,6 @@ fn encryptSFn(text: []const u8, key: u5, _: void, output: []u8) void {
     }
 }
 
-fn decryptSFn(text: []const u8, key: u5, _: void, output: []u8) void {
-    encryptSFn(text, 26 - key, {}, output);
+pub fn decryptS(text: []const u8, key: KeyType, _: void, output: []u8) void {
+    encryptS(text, 26 - key, {}, output);
 }
-
-pub usingnamespace cipher.Cipher(
-    Context,
-    //
-    u5,
-    dupeFn,
-    copyFn,
-    idxFn,
-    freeFn,
-    nextFn,
-    //
-    detectSafetyFn,
-    //
-    decryptFn,
-    encryptFn,
-    decryptSFn,
-    encryptSFn,
-    //
-    .Mono,
-);
